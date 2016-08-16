@@ -1,0 +1,4 @@
+﻿CREATE USER [open] FOR LOGIN [open]
+GO
+
+GRANT CONNECT TO [open]

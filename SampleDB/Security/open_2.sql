@@ -1,0 +1,6 @@
+﻿CREATE SCHEMA [open] AUTHORIZATION [dbo];
+GO;
+
+GRANT EXECUTE ON SCHEMA::[open] TO [open]
+GO;
+
