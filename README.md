@@ -12,7 +12,7 @@ Requires SQL Server 2016
 
   Create the SampleDB in SQL Server Management Studio
 
-  Set the Db Project and run to build the database
+  Set the Db Project as startup and run to build the database
 
   Run the tests
 
