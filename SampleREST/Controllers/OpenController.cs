@@ -28,9 +28,11 @@ namespace SampleREST.Controllers
         [Route("api/open/{specificName}")]
         public HttpResponseMessage Get(string specificName)
         {
-            RestProcedure procedure = ProcedureFactory.GetRestProcedure("GET", "open", specificName);
-            procedure.LoadFromQuery(Request.GetQueryNameValuePairs());
-            return  procedure.GetResponse();
+            using (RestProcedure procedure = ProcedureFactory.GetRestProcedure("GET", "open", specificName))
+            {
+                procedure.LoadFromQuery(Request.GetQueryNameValuePairs());
+                return procedure.GetResponse();
+            }
         }
 
         [AcceptVerbs("POST")]
@@ -38,9 +40,11 @@ namespace SampleREST.Controllers
         public async Task<HttpResponseMessage> Post(string specificName)
         {
             string requestJson = await Request.Content.ReadAsStringAsync();
-            RestProcedure procedure = ProcedureFactory.GetRestProcedure("POST", "open", specificName);
-            procedure.LoadFromJson(requestJson);
-            return procedure.GetResponse();
+            using (RestProcedure procedure = ProcedureFactory.GetRestProcedure("POST", "open", specificName))
+            {
+                procedure.LoadFromJson(requestJson);
+                return procedure.GetResponse();
+            }
         }
 
         [AcceptVerbs("PUT")]
@@ -48,9 +52,11 @@ namespace SampleREST.Controllers
         public async Task<HttpResponseMessage> Put(string specificName)
         {
             string requestJson = await Request.Content.ReadAsStringAsync();
-            RestProcedure procedure = ProcedureFactory.GetRestProcedure("PUT", "open", specificName);
-            procedure.LoadFromJson(requestJson);
-            return procedure.GetResponse();
+            using (RestProcedure procedure = ProcedureFactory.GetRestProcedure("PUT", "open", specificName))
+            {
+                procedure.LoadFromJson(requestJson);
+                return procedure.GetResponse();
+            }
         }
 
         [AcceptVerbs("DELETE")]
@@ -58,9 +64,11 @@ namespace SampleREST.Controllers
         public async Task<HttpResponseMessage> Delete(string specificName)
         {
             string requestJson = await Request.Content.ReadAsStringAsync();
-            RestProcedure procedure = ProcedureFactory.GetRestProcedure("DELETE", "open", specificName);
-            procedure.LoadFromJson(requestJson);
-            return procedure.GetResponse();
+            using (RestProcedure procedure = ProcedureFactory.GetRestProcedure("DELETE", "open", specificName))
+            {
+                procedure.LoadFromJson(requestJson);
+                return procedure.GetResponse();
+            }
         }
     }
 }

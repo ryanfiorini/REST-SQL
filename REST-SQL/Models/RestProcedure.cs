@@ -22,7 +22,7 @@ namespace REST_SQL.Models
 
             foreach (KeyValuePair<string, string> kp in keyValuePairs)
             {
-                SetValue(kp.Key, (object)kp.Value);
+                SetValue(kp.Key, kp.Value);
             }
         }
 
@@ -53,7 +53,7 @@ namespace REST_SQL.Models
         public new void SetValue<T>(string name, T value)
         {
             string parameterName = name.ToSqlName();
-            base.SetValue<object>(parameterName, value);
+            base.SetValue<T>(parameterName, value);
         }
     
 
@@ -100,7 +100,7 @@ namespace REST_SQL.Models
         public HttpResponseMessage GetResponse()
         {
             string json = ExecuteJson();
-            HttpResponseMessage result = new HttpResponseMessage((HttpStatusCode)ReturnValue<int>());
+            HttpResponseMessage result = new HttpResponseMessage((HttpStatusCode)ReturnValue());
             if (result.StatusCode != HttpStatusCode.OK)
             {
                 json = GetValue<string>("@MESSAGE_RESULT");

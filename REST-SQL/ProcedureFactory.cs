@@ -49,13 +49,16 @@ namespace REST_SQL
             {
                 Procedure source = _procedures[procedureName];
                 string serialized = JsonConvert.SerializeObject(source);
-                return JsonConvert.DeserializeObject<Procedure>(serialized);
+                Procedure result = JsonConvert.DeserializeObject<Procedure>(serialized);
+                result.Initialize();
+                return result;
             }
             catch (Exception ex)
             {
                 throw new MissingMethodException($"No procedure found for Stored Procedure {procedureName}");
             }
         }
+
 
         /// <summary>
         /// Creates a new procedure based on the given parameters
@@ -72,7 +75,9 @@ namespace REST_SQL
             {
                 Procedure source = _procedures[procedureName];
                 string serialized = JsonConvert.SerializeObject(source);
-                return JsonConvert.DeserializeObject<RestProcedure>(serialized);
+                RestProcedure result = JsonConvert.DeserializeObject<RestProcedure>(serialized);
+                result.Initialize();
+                return result;
             }
             catch (Exception ex)
             {
