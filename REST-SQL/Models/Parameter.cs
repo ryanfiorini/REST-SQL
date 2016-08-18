@@ -25,85 +25,24 @@ namespace REST_SQL.Models
         public long? NumericMaximumValue { set; get; }
         public string RegularExpression { set; get; }
         public bool IsNullable { set; get; } = true;
-        public string FriendlyName { set; get; }
 
+        private object _value;
+        
         #endregion
-
-        #region |Private Variables|
-
-        private SqlParameter _sqlNativeParameter = null;
-
-        #endregion
-
-        #region |Constructors|
-
-        /// <summary>
-        /// Default contructor - instantiates private _sqlNativeParameter
-        /// </summary>
-        public Parameter()
-        {
-            //TODO: check if required
-            //_sqlNativeParameter = new SqlParameter();
-        }
-
-        #endregion
-
 
         #region |Public Methods|
-
-        /// <summary>
-        /// Validates the parameter based on the attributes >> validate()
-        /// </summary>
-        public void Validate()
-        {
-            if (_sqlNativeParameter.Value == DBNull.Value)
-            {
-                validate(null);
-            }
-            else
-            {
-                validate(_sqlNativeParameter.Value);
-            }
-        }
-
 
         /// <summary>
         /// Sets the value of the parameter
         /// Using this Generic variation enforces type collusion between c# and sql
         /// </summary>
         /// <typeparam name="T">Type of parameter</typeparam>
-        /// <param name="value">value of type T</param>
+        /// <param name="value">value</param>
         public void SetValue<T>(T value)
         {
             validate(value);
-            if (typeof(T) != getCSharpType())
-            {
-                throw new InvalidCastException($"Parameter {ParameterName} cannot be cast - Sql Data type {DataType} maps to C# type {getCSharpType()} and value provide was {typeof(T).ToString()}");
-            }
-            _sqlNativeParameter.Value = value;
-        }
-
-        /// <summary>
-        /// Sets the value of the parameter
-        /// </summary>
-        /// <param name="value">value</param>
-        public void SetValue(object value)
-        {
-            validate(value);
-            _sqlNativeParameter.Value = value;
-        }
-
-        /// <summary>
-        /// Gets the value of the parameter
-        /// </summary>
-        /// <returns>object value</returns>
-        public object GetValue()
-        {
-            if(_sqlNativeParameter.Value == DBNull.Value)
-            {
-                return null;
-            }
-            return _sqlNativeParameter.Value;
+            checkCSharpType(typeof(T));
+            _value = value;
         }
 
         /// <summary>
@@ -113,37 +52,59 @@ namespace REST_SQL.Models
         /// <returns>Parameter value as T or default(T) for DBNull.value</returns>
         public T GetValue<T>()
         {
-            if (_sqlNativeParameter.Value == DBNull.Value)
+            checkCSharpType(typeof(T));
+            if (_value == null)
             {
                 return default(T);
             }
-            if (typeof(T) != getCSharpType())
-            {
-                throw new InvalidCastException($"Sql Data type {DataType} maps to C# type {getCSharpType()} paramter name {ParameterName.FromSqlParameterName()}");
-            }
-            return (T)Convert.ChangeType(_sqlNativeParameter.Value, typeof(T));
+            return (T)Convert.ChangeType(_value, typeof(T));
         }
 
         /// <summary>
         /// If the native parameter is null it creates it
         /// </summary>
         /// <returns>Sql Parameter</returns>
-        public SqlParameter NativeSqlParameter()
+        public SqlParameter ToSqlParameter()
         {
-            if(_sqlNativeParameter == null)
-            {
-                _sqlNativeParameter = new SqlParameter();
-                _sqlNativeParameter.ParameterName = ParameterName;
-                setParameterDirection();
-                setDataType();
-                _sqlNativeParameter.Value = DBNull.Value;
-            }
-            return _sqlNativeParameter;
+            SqlParameter result = null;
+            result = new SqlParameter();
+            result.ParameterName = ParameterName;
+            setParameterDirection(result);
+            setDataType(result);
+            result.Value = DBNull.Value;
+            return result;
         }
 
         #endregion
 
         #region |Private Methods|
+
+        /// <summary>
+        /// Calls the set of validation routines for the value passed
+        /// </summary>
+        /// <param name="value"></param>
+        private void validate(object value)
+        {
+            checkNull(value);
+            if (value == null) return;
+            checkMaxLength(value);
+            checkNumericRange(value);
+            checkRegEx(value);
+        }
+
+        /// <summary>
+        /// Validates the type against what is expected according to the DB type
+        /// </summary>
+        /// <param name="t"></param>
+        private void checkCSharpType(Type t)
+        {
+            if (t == typeof(object)) return;
+
+            if (t != getCSharpType())
+            {
+                throw new InvalidCastException($"Sql Data type {DataType} maps to C# type {getCSharpType()} paramter name {ParameterName.FromSqlParameterName()}");
+            }
+        }
 
         /// <summary>
         /// Checks the value against CharacterMaximumLength
@@ -222,33 +183,20 @@ namespace REST_SQL.Models
         }
 
         /// <summary>
-        /// Calls the set of validation routines for the value passed
-        /// </summary>
-        /// <param name="value"></param>
-        private void validate(object value)
-        {
-            checkNull(value);
-            if (value == null) return;
-            checkMaxLength(value);
-            checkNumericRange(value);
-            checkRegEx(value);
-        }
-
-        /// <summary>
         /// Sets the parameter direction of the _sqlNativeParameter
         /// </summary>
-        private void setParameterDirection()
+        private void setParameterDirection(SqlParameter parameter)
         {
             switch (ParameterMode)
             {
                 case "IN":
-                    _sqlNativeParameter.Direction = ParameterDirection.Input;
+                    parameter.Direction = ParameterDirection.Input;
                     break;
                 case "OUT":
-                    _sqlNativeParameter.Direction = ParameterDirection.ReturnValue;
+                    parameter.Direction = ParameterDirection.ReturnValue;
                     break;
                 case "INOUT":
-                    _sqlNativeParameter.Direction = ParameterDirection.Output;
+                    parameter.Direction = ParameterDirection.Output;
                     break;
             }
         }
@@ -294,64 +242,64 @@ namespace REST_SQL.Models
         /// <summary>
         /// Sets the data type of the _sqlNativeParameter
         /// </summary>
-        private void setDataType()
+        private void setDataType(SqlParameter parameter)
         {
             switch (DataType)
             {
                 case "bigint":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.BigInt;
+                    parameter.SqlDbType = SqlDbType.BigInt;
                     break;
                 case "int":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.Int;
+                    parameter.SqlDbType = SqlDbType.Int;
                     break;
                 case "smallint":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.SmallInt;
+                    parameter.SqlDbType = SqlDbType.SmallInt;
                     break;
                 case "tinyint":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.TinyInt;
+                    parameter.SqlDbType = SqlDbType.TinyInt;
                     break;
                 case "bit":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.Bit;
+                    parameter.SqlDbType = SqlDbType.Bit;
                     break;
                 case "char":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.Char;
-                    _sqlNativeParameter.Size = CharacterMaximumLength.Value;
+                    parameter.SqlDbType = SqlDbType.Char;
+                    parameter.Size = CharacterMaximumLength.Value;
                     break;
                 case "varchar":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.VarChar;
-                    _sqlNativeParameter.Size = CharacterMaximumLength.Value;
+                    parameter.SqlDbType = SqlDbType.VarChar;
+                    parameter.Size = CharacterMaximumLength.Value;
                     break;
                 case "nchar":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.NChar;
-                    _sqlNativeParameter.Size = CharacterMaximumLength.Value;
+                    parameter.SqlDbType = SqlDbType.NChar;
+                    parameter.Size = CharacterMaximumLength.Value;
                     break;
                 case "nvarchar":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.NVarChar;
-                    _sqlNativeParameter.Size = CharacterMaximumLength.Value;
+                    parameter.SqlDbType = SqlDbType.NVarChar;
+                    parameter.Size = CharacterMaximumLength.Value;
                     break;
                 case "smalldatetime":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.SmallDateTime;
+                    parameter.SqlDbType = SqlDbType.SmallDateTime;
                     break;
                 case "date":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.Date;
+                    parameter.SqlDbType = SqlDbType.Date;
                     break;
                 case "datetime":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.DateTime;
+                    parameter.SqlDbType = SqlDbType.DateTime;
                     break;
                 case "datetime2":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.DateTime;
-                    _sqlNativeParameter.Scale = (byte)DateTimePrecision;
+                    parameter.SqlDbType = SqlDbType.DateTime;
+                    parameter.Scale = (byte)DateTimePrecision;
                     break;
                 case "time":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.Time;
-                    _sqlNativeParameter.Scale = (byte)DateTimePrecision;
+                    parameter.SqlDbType = SqlDbType.Time;
+                    parameter.Scale = (byte)DateTimePrecision;
                     break;
                 case "datetimeoffset":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.DateTimeOffset;
-                    _sqlNativeParameter.Scale = (byte)DateTimePrecision;
+                    parameter.SqlDbType = SqlDbType.DateTimeOffset;
+                    parameter.Scale = (byte)DateTimePrecision;
                     break;
                 case "uniqueidentifier":
-                    _sqlNativeParameter.SqlDbType = SqlDbType.UniqueIdentifier;
+                    parameter.SqlDbType = SqlDbType.UniqueIdentifier;
                     break;
                 default:
                     throw new ArgumentException($"data type {DataType} is not yet supported, add data type to Parameter.cs setDataType()");

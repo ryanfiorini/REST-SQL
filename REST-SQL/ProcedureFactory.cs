@@ -49,9 +49,7 @@ namespace REST_SQL
             {
                 Procedure source = _procedures[procedureName];
                 string serialized = JsonConvert.SerializeObject(source);
-                Procedure clone = JsonConvert.DeserializeObject<Procedure>(serialized);
-                clone.Initialize();
-                return clone;
+                return JsonConvert.DeserializeObject<Procedure>(serialized);
             }
             catch (Exception ex)
             {
@@ -74,9 +72,7 @@ namespace REST_SQL
             {
                 Procedure source = _procedures[procedureName];
                 string serialized = JsonConvert.SerializeObject(source);
-                RestProcedure clone = JsonConvert.DeserializeObject<RestProcedure>(serialized);
-                clone.Initialize();
-                return clone;
+                return JsonConvert.DeserializeObject<RestProcedure>(serialized);
             }
             catch (Exception ex)
             {
@@ -95,11 +91,6 @@ namespace REST_SQL
                 }
             }
             var jsonSerializerSettings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
-
-            //BUILD LIST
-
-
-
             return JsonConvert.SerializeObject(lst, jsonSerializerSettings);
         }
 

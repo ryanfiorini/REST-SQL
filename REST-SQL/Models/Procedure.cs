@@ -12,7 +12,7 @@ using REST_SQL.Extensions;
 
 namespace REST_SQL.Models
 {
-    public class Procedure : IDisposable
+    public class Procedure
     {
 
         #region |Public Properties|
@@ -24,61 +24,72 @@ namespace REST_SQL.Models
         public bool IsSingleResult { set; get; }
         public bool IsAlwaysEncrypted { set; get; }
         public bool IsNonQuery { set; get; }
-
         public List<Parameter> Parameters { set; get; }
         public string ConnectionString { set; get; }
 
         #endregion
 
-        #region |Private Variables|
-
-        private SqlCommand _sqlCommand = null;
-        private bool disposedValue = false;
-
-
-        #endregion
-
         #region |Public Methods|
 
-        /// <summary>
-        /// Called during the clone operation in ProcedureFactory
-        /// Creates the command and wires up the connection
-        /// </summary>
-        public void Initialize()
+        private SqlCommand buildCommand()
         {
+            SqlCommand result = new SqlCommand();
             if (RoutineType != "FUNCTION")
             {
                 Parameters.Insert(0, new Parameter() { IsResult = "YES", ParameterName = "@RETURN_VALUE", DataType = "int", ParameterMode = "OUT" });
             }
-            _sqlCommand = new SqlCommand();
-            _sqlCommand.CommandText = $"[{this.SpecificSchema}].[{this.SpecificName}]";
-            _sqlCommand.CommandType = CommandType.StoredProcedure;
-            _sqlCommand.Connection = getConnection();
+            result = new SqlCommand();
+            result.CommandText = $"[{this.SpecificSchema}].[{this.SpecificName}]";
+            result.CommandType = CommandType.StoredProcedure;
 
             foreach (Parameter parameter in Parameters)
             {
-                _sqlCommand.Parameters.Add(parameter.NativeSqlParameter());
-                parameter.FriendlyName = parameter.ParameterName.FromSqlParameterName();
+                result.Parameters.Add(parameter.ToSqlParameter());
             }
-            _sqlCommand.Connection = getConnection();
+            return result;
         }
 
-        
+        public SqlCommand BuildSetValidate()
+        {
+            SqlCommand result = buildCommand();
 
+            foreach (Parameter parameter in Parameters)
+            {
+                if(parameter.ParameterMode == "IN" || parameter.ParameterMode == "INOUT")
+                {
+                    if(parameter.GetValue<object>() == null && parameter.IsNullable == false )
+                    {
+                        throw new ArgumentException($"Required parameter {parameter.ParameterName} was not found in the collection");
+                    }
+                    result.Parameters[parameter.ParameterName].Value = parameter.GetValue<object>();
+                }
+            }
+            return result;
+        }
+        
         /// <summary>
         /// Executes procedure and returns json string
+        /// Requires a stored procedure to return a single row single column result ie Json
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Returns the string of json</returns>
         public string ExecuteJson()
         {
             StringBuilder stringBuilder = new StringBuilder();
-            SqlDataReader rdr = ExecuteReader();
-            while (rdr.Read())
+            using (SqlConnection cnn = new SqlConnection(ConnectionString))
             {
-                stringBuilder.Append(rdr.GetString(0));
+                using (SqlCommand cmd = BuildSetValidate())
+                {
+                    cmd.Connection = cnn;
+                    cnn.Open();
+                    SqlDataReader rdr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+                    while (rdr.Read())
+                    {
+                        stringBuilder.Append(rdr.GetString(0));
+                    }
+                    rdr.Close();
+                    retrieveValues(cmd);
+                }
             }
-            rdr.Close();
-            rdr = null;
 
             return stringBuilder.ToString();
         }
@@ -90,22 +101,22 @@ namespace REST_SQL.Models
         /// <returns>DataTable</returns>
         public DataTable ExecuteDataTable()
         {
-            SqlDataReader rdr = ExecuteReader();
+            BuildSetValidate();
             DataTable result = new DataTable();
-            result.Load(rdr);
-            rdr.Close();
-            rdr = null;
+            using (SqlConnection cnn = new SqlConnection(ConnectionString))
+            {
+                using (SqlCommand cmd = BuildSetValidate())
+                {
+                    cmd.Connection = cnn;
+                    cnn.Open();
+                    SqlDataReader rdr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+                    result.Load(rdr);
+                    rdr.Close();
+                    retrieveValues(cmd);
+                }
+                
+            }
             return result;
-        }
-
-        /// <summary>
-        /// Executes procedure and returns SqlDataReader
-        /// </summary>
-        /// <returns>SqlDataReader</returns>
-        public SqlDataReader ExecuteReader()
-        {
-            validate();
-            return _sqlCommand.ExecuteReader();
         }
 
         /// <summary>
@@ -113,7 +124,35 @@ namespace REST_SQL.Models
         /// </summary>
         public void ExecuteNonQuery()
         {
-            _sqlCommand.ExecuteNonQuery();
+            using (SqlConnection cnn = new SqlConnection(ConnectionString))
+            {
+                using (SqlCommand cmd = BuildSetValidate())
+                {
+                    cmd.Connection = cnn;
+                    cnn.Open();
+                    cmd.ExecuteNonQuery();
+                    cnn.Close();
+                    retrieveValues(cmd);
+                }
+            }
+        }
+
+        private void retrieveValues(SqlCommand cmd)
+        {
+            foreach(Parameter parameter in Parameters)
+            {
+                if(parameter.ParameterMode == "OUT" || parameter.ParameterMode == "INOUT")
+                {
+                    if(cmd.Parameters[parameter.OrdinalPosition].Value == DBNull.Value)
+                    {
+                        parameter.SetValue<object>(null);
+                    }
+                    else
+                    {
+                        parameter.SetValue<object>(cmd.Parameters[parameter.OrdinalPosition].Value);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -142,7 +181,7 @@ namespace REST_SQL.Models
         /// <typeparam name="T">type of return value</typeparam>
         /// <param name="position">ordinal position of parameter</param>
         /// <returns>value as T</returns>
-        public T GetValue<T>(int position)
+        public virtual T GetValue<T>(int position)
         {
             return getParameter(position).GetValue<T>();
         }
@@ -153,7 +192,7 @@ namespace REST_SQL.Models
         /// <typeparam name="T">type of value</typeparam>
         /// <param name="name">name of parameter</param>
         /// <param name="value">value of parameter</param>
-        public void SetValue<T>(string name, T value)
+        public virtual void SetValue<T>(string name, T value)
         {
             getParameter(name).SetValue<T>(value);
         }
@@ -180,35 +219,13 @@ namespace REST_SQL.Models
         #region |Private Methods|
 
         /// <summary>
-        /// Creates and opens a connection
-        /// </summary>
-        /// <returns>SqlConnection</returns>
-        private SqlConnection getConnection()
-        {
-            SqlConnection result = new SqlConnection(ConnectionString);
-            result.Open();
-            return result;
-        }
-
-        /// <summary>
-        /// Validates the all the parameters in the collection
-        /// </summary>
-        private void validate()
-        {
-            foreach (Parameter parameter in Parameters)
-            {
-                parameter.Validate();
-            }
-        }
-
-        /// <summary>
         /// Gets a parameter by name
         /// </summary>
         /// <param name="name">name of parameter</param>
         /// <returns>Parameter</returns>
         private Parameter getParameter(string name)
         {
-            string parameterName = name.StartsWith("@") ? name : $"{name.ToSqlName()}";
+            string parameterName = name.StartsWith("@") ? name : $"@{name}";
             try
             {
                 return Parameters.First(p => p.ParameterName == parameterName);
@@ -228,39 +245,6 @@ namespace REST_SQL.Models
         {
             return Parameters[position];
         }
-
-        #endregion
-
-        #region | IDisposable |
-
-        /// <summary>
-        /// Handles clean up
-        /// </summary>
-        /// <param name="disposing">to prevent redundant calls</param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    if (_sqlCommand.Connection.State != ConnectionState.Closed)
-                    {
-                        _sqlCommand.Connection.Close();
-                        _sqlCommand.Connection.Dispose();
-                    }
-                    _sqlCommand.Dispose();
-                }
-
-                disposedValue = true;
-            }
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-
-        
 
         #endregion
 

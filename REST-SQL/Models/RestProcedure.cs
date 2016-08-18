@@ -44,6 +44,20 @@ namespace REST_SQL.Models
             }
         }
 
+        /// <summary>
+        /// Sets the value as T based on the name
+        /// </summary>
+        /// <typeparam name="T">type of value</typeparam>
+        /// <param name="name">name of parameter</param>
+        /// <param name="value">value of parameter</param>
+        public new void SetValue<T>(string name, T value)
+        {
+            string parameterName = name.ToSqlName();
+            base.SetValue<object>(parameterName, value);
+        }
+    
+
+
         public string GetQueryParameters()
         {
             //pull the method type off the paramater name
